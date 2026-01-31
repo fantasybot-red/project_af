@@ -36,7 +36,7 @@ class HuggingfaceSupport(Module):
             ```
         """
 
-        modal = os.getenv("HUGGINGFACE_MODEL")
+        modal = os.getenv("HUGGINGFACE_MODEL_IMAGE")
         if not self.client.huggingface or not modal:
             return {
                 "success": False,

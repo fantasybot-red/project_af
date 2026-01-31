@@ -2,9 +2,7 @@ import base64
 import io
 import mimetypes
 import os
-import time
 import traceback
-from typing import List
 
 import discord
 from discord import Message, Embed, Member, User

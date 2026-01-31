@@ -172,7 +172,7 @@ class SearchTool(Module):
         - Taget context should be clear and MUST be detailed as possible
         - If you don't have enough information, ask user for more details
         - Define detailed target context for content filtering
-        - Request clarification for ambiguous prompts
+        - Request clarification for ambiguous search queries or target contexts
         - No NSFW content searches allowed
         - ONLY use when user requests deep search.
         - Recommend use `search` tool for general searches then `fetch` tool for specific URLs.

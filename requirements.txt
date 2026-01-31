@@ -1,11 +1,10 @@
 openai
 python-dotenv
 aiohttp
-git+https://github.com/huggingface/huggingface_hub
+huggingface_hub
 Pillow
 mcp
 google-custom-search[async]
 markitdown[all]
 numpy
-transformers
 git+https://github.com/Rapptz/discord.py.git
