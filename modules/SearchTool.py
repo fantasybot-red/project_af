@@ -3,26 +3,40 @@ import io
 import json
 import os
 from typing import Dict, List, Optional, Any
-
 import aiohttp
 import numpy as np
+from ddgs import DDGS
 from numpy.linalg import norm
 from markitdown import MarkItDown, DocumentConverterResult, StreamInfo
-
 from classs import Module, tool
 from classs.AIContext import AIContext
-from google_custom_search import Item
+from concurrent.futures import ThreadPoolExecutor
 
+pool = ThreadPoolExecutor()
+
+class SearchItem:
+    def __init__(self, data: Dict[str, Any]):
+        self.title = data.get("title", "")
+        self.url = data.get("href", "")
+        self.snippet = data.get("body", "")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "title": self.title,
+            "url": self.url,
+            "snippet": self.snippet,
+        }
 
 class SearchTool(Module):
 
     def __init__(self, client):
         super().__init__(client)
         self.md = MarkItDown(enable_plugins=True, enable_builtins=True)
+        self.ddgs = DDGS()
         self.feature_extraction_model = os.getenv('HUGGINGFACE_MODEL_FEATURE_EXTRACTION')
         self.openai_model = os.getenv('OPENAI_API_MODAL')
 
-    async def process_body(self, item: Item) -> Optional[str]:
+    async def process_body(self, item: SearchItem) -> Optional[str]:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(item.url) as response:
@@ -38,8 +52,7 @@ class SearchTool(Module):
             print(f"Error processing {item.url}: {str(e)}")
             return None
 
-    async def process_search_results(self, context: str, search_results: List[Item]) -> str | None:
-
+    async def process_search_results(self, context: str, search_results: List[SearchItem]) -> str | None:
         documents_raw = await asyncio.gather(*[self.process_body(result) for result in search_results])
         cleaned_documents = [doc for doc in documents_raw if doc is not None]
 
@@ -86,20 +99,13 @@ class SearchTool(Module):
 
         return np.dot(v1, v2) / (n1 * n2)
 
-    def _refomart_item_to_dict(self, item: Item, show:bool=True) -> Dict[str, Any]:
-        return {
-            "title": item.title,
-            "url": item.url,
-            "snippet": item.snippet if show else "Using fetch tool to get content",
-        }
-
     def _create_evaluation_message(
             self,
             original_target: str,
             current_target: str,
             search_query: str,
-            stored_results: List[Item],
-            new_results: List[Item]
+            stored_results: List[SearchItem],
+            new_results: List[SearchItem]
     ) -> List[Dict]:
         return [
             {
@@ -119,12 +125,12 @@ class SearchTool(Module):
                     "rating": 0 -> 100 // Rating quality of the selected context and filtered data
                 }}
                 Context Selected:
-                {json.dumps([self._refomart_item_to_dict(i) for i in stored_results])}
+                {json.dumps([i.to_dict() for i in stored_results])}
                 """
             },
             {
                 "role": "user",
-                "content": json.dumps([self._refomart_item_to_dict(i) for i in new_results])
+                "content": json.dumps([i.to_dict() for i in new_results])
             }
         ]
 
@@ -185,8 +191,7 @@ class SearchTool(Module):
         - Translate/reformat only when necessary for readability
         """
 
-        if (self.client.google_search_client is None or
-                self.client.huggingface is None or
+        if (self.client.huggingface is None or
                 not self.feature_extraction_model):
             return {
                 "success": False,
@@ -208,8 +213,9 @@ class SearchTool(Module):
             elif results and iterations > max_iterations:
                 break
 
-            # noinspection PyUnresolvedReferences
-            search_results = await self.client.google_search_client.search(search_query)
+            search_results = await asyncio.get_running_loop().run_in_executor(
+                pool, lambda: [SearchItem(data) for data in self.ddgs.text(search_query, backend="bing")]
+            )
 
 
             evaluation_message = self._create_evaluation_message(
@@ -281,13 +287,10 @@ class SearchTool(Module):
         Use this instead of `search` if the user provides a direct URL.
         This is better when user wants to summarize or analyze specific all content from a URL.
         """
-        item = Item({
-            "kind": "customsearch#result",
+        item = SearchItem({
             "title": "Fetched Content",
-            "link": url,
-            "displayLink": url,
-            "htmlTitle": f"<a href='{url}'>{url}</a>",
-            "snippet": "Content fetched from the provided URL."
+            "href": url,
+            "body": "Content fetched from the provided URL."
         })
         data = await self.process_body(item)
         if data:
@@ -317,12 +320,9 @@ class SearchTool(Module):
         Return the relevant context based on the search query.
         """
         item = Item({
-            "kind": "customsearch#result",
             "title": "Fetched Content",
-            "link": url,
-            "displayLink": url,
-            "htmlTitle": f"<a href='{url}'>{url}</a>",
-            "snippet": "Content fetched from the provided URL."
+            "href": url,
+            "body": "Content fetched from the provided URL."
         })
         relevant_context = await self.process_search_results(query, [item])
         if relevant_context:

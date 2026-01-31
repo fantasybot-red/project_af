@@ -7,4 +7,5 @@ mcp
 google-custom-search[async]
 markitdown[all]
 numpy
+ddgs
 git+https://github.com/Rapptz/discord.py.git

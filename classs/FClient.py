@@ -3,20 +3,14 @@ import json
 import os
 import traceback
 from typing import List
-import base64
-import aiohttp
 import discord
 from string import Template
-
-from discord.ui import LayoutView
-from google_custom_search import CustomSearch, AiohttpAdapter
 
 from classs.AIContext import AIContext
 from openai import AsyncAzureOpenAI, BadRequestError, AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 from huggingface_hub import AsyncInferenceClient
-
 from classs.FormatMessages import FormatMessages
 from classs.MCPManager import MCPManager
 
@@ -29,8 +23,9 @@ class FClient(discord.Client):
     emojis: dict = {}
     functions = {}
     functions_json_schema = []
-    google_search_client: CustomSearch = None
     format_messages: FormatMessages
+
+
 
     def __init__(self, **options):
         intents = discord.Intents.all()
@@ -60,13 +55,6 @@ class FClient(discord.Client):
                 **options
             )
 
-    def load_google_search(self):
-        if os.getenv('GOOGLE_API_KEY') and os.getenv('GOOGLE_SEARCH_ENGINE_ID'):
-            self.google_search_client = CustomSearch(
-                AiohttpAdapter(apikey=os.getenv('GOOGLE_API_KEY'), engine_id=os.getenv('GOOGLE_SEARCH_ENGINE_ID'))
-            )
-        else:
-            self.google_search_client = None
 
     def load_huggingface(self):
         if os.getenv('HUGGINGFACE_TOKEN'):
